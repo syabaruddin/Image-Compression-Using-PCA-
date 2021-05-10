@@ -1,0 +1,200 @@
+---
+title: "Image Compression Using PCA : Sumba Island Picture"
+author: "By : Syabaruddin Malik"
+output:
+  html_document:
+    df_print: paged
+    highlight: zenburn
+    theme: spacelab
+    toc: true
+    toc_float:
+      collapsed: yes
+    number_sections : false
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  message = FALSE,
+  warning = FALSE,
+  fig.align = "center",
+  comment = "#>")
+options(scipen = 9999)
+
+```
+
+# Introduction
+
+Hi Everyone! In this kernel I am going to use the statistical method PCA (Principal Component Analysis) to compress images.
+
+PCA is mathematically defined as an orthogonal linear transformation that transforms the data to a new coordinate system such that the greatest variance by some projection of the data comes to lie on the first coordinate (called the first principal component), the second greatest variance on the second coordinate, and so on. In other words, we convert a set of observations of possibly correlated variables into a set of values of linearly uncorrelated variables called principal components.
+
+Reference: https://en.wikipedia.org/wiki/Principal_component_analysis
+
+# Library
+
+Before we do the image compression using PCA, we need to load all the libraries needed
+
+```{r}
+# Load libraries
+library(tidyverse)
+library(jpeg)
+library(factoextra)
+library(knitr)
+```
+
+# Image Loading
+
+Now let us read the image first
+
+```{r}
+# Read image 
+image <- readJPEG("sumba.jpg")
+```
+
+Now let us check the structure of the image
+
+```{r}
+# Structure
+str(image)
+```
+
+```{r}
+# Dimension
+
+dim(image)
+```
+The image is now represented as three 2000x3000 matrices as an array with each matrix corresponding to the RGB color value scheme.
+
+# PCA
+
+We are going to break down each color scheme into three data frames.
+
+```{r}
+# RGB color matrices
+rimage <- image[,,1]
+gimage <- image[,,2]
+bimage <- image[,,3]
+
+```
+
+Then we can apply the PCA separately for each color scheme.
+
+```{r}
+# PCA for each color scheme
+pcar <- prcomp(rimage, center=FALSE)
+pcag <- prcomp(gimage, center=FALSE)
+pcab <- prcomp(bimage, center=FALSE)
+
+# PCA objects into a list
+pcaimage <- list(pcar, pcag, pcab)
+```
+
+
+# Scree plot and cumulative variation plot
+
+In the following visualization we can study the percentage of variances explained by each principal component.
+
+```{r}
+# Data frame for easier plotting
+df_image <- data.frame(scheme=rep(c("R", "G", "B"), each=nrow(image)), 
+                 index=rep(1:nrow(image), 3),
+                 var=c(pcar$sdev^2,
+                       pcag$sdev^2,
+                       pcab$sdev^2))
+
+# Scree plot 
+df_image %>% 
+  group_by(scheme) %>%
+  mutate(propvar=100*var/sum(var)) %>%
+  ungroup() %>%
+  ggplot(aes(x=index, y=propvar, fill=scheme)) + 
+  geom_bar(stat="identity") +
+  labs(title="Scree Plot", x="Principal Component", 
+       y="% of Variance") + 
+  scale_x_continuous(limits=c(0, 20)) +
+  scale_fill_viridis_d() +
+  facet_wrap(~scheme) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position="bottom") 
+
+```
+
+
+If we look at the Scree plot above, With only the first principal component we can explain more than 70% of the total variance. Maybe the visualization is better if we plot the cumulative variation. Let’s check it out!
+
+```{r}
+# Cumulative variation plot
+df_image %>% 
+  group_by(scheme) %>%
+  mutate(propvar=100*var/sum(var)) %>%
+  mutate(cumsum=cumsum(propvar)) %>%
+  ungroup() %>%
+  ggplot(aes(x=index, y=cumsum, fill=scheme)) + 
+  geom_bar(stat="identity") + 
+  labs(title="Cumulative Proportion of Variance Explained", 
+       x="Principal Component", y="Cumulative % of Variance") + 
+  scale_x_continuous(limits=c(0, 20)) +
+  scale_fill_viridis_d() +
+  facet_wrap(~scheme) +
+  theme_bw() +
+  theme(legend.title=element_blank(),
+        legend.position="bottom")
+```
+Same as scree plot, with Cumulative proportion of variance, With only the first principal component we also can explain more than 70% of the total variance.
+
+# Image Reconstruction
+
+In the following code we reconstruct the 7 times: using 5, 50, 500, 800, 1200 and 1600 principal components. As more principal components are used, the more the variance (information) is described. The first few principal components will have the most drastic change in quality while the last few components will not make much if any, difference to quality.
+
+The picture is coming from website : https://sumba-information.com/
+
+```{r}
+# PCs values
+pcnum <- c(5,50,500,800,1200,1600)
+
+# Reconstruct the image four times
+for(i in pcnum){
+    pca.img <- sapply(pcaimage, function(j){
+      compressed.img <- j$x[, 1:i] %*% t(j$rotation[, 1:i])
+    }, simplify='array') 
+  writeJPEG(pca.img, paste("C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/Image reconstruction with", 
+            round(i, 0), "principal components.jpg"))
+}
+```
+
+The code saves the seven images in local PC using the function writeJPEG(). Let’s see the results:
+
+### Image reconstruction with 5 principal components
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/5.jpg)
+
+### Image reconstruction with 50 principal components
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/50.jpg)
+
+### Image reconstruction with 500 principal components
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/500.jpg)
+
+### Image reconstruction with 800 principal components
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/800.jpg)
+
+### Image reconstruction with 1200 principal components
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/1200.jpg)
+
+### Image reconstruction with 1600 principal components
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/1600.jpg)
+
+### Original Image
+
+![](C:/SyabaruddinFolder/Work/Algoritma/DATAScicourse/UnsupervisedMachineLearning/LBBUL/sumba.jpg)
+
+# Summary
+
+If we look at the result images, The reconstructed images with 1200 and 1600 principal components are very similar, so the remaining iterations will, therefore, have little improvement.
+
